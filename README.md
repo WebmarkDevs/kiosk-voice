@@ -1,14 +1,34 @@
-# kiosk-voice
+### Documentation for Dockerized Environment with `.env.local`
 
+---
 
+### **Setup Steps**
 
-```console
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 agent.py dev
+1. **Create `.env.local`**:
+   ```
+   ENV=dev
+   ```
+
+2. **Project Structure**:
+   ```
+   .
+   ├── Dockerfile.agent
+   ├── Dockerfile.main
+   ├── docker-compose.yml
+   ├── requirements.txt
+   ├── agent.py
+   ├── main.py
+   ├── .env.local
+   ```
+
+3. **Run**:
+   ```bash
+   docker-compose up --build
+   ```
+
+---
+
+### **Stop Services**:
+```bash
+docker-compose down
 ```
-Open new terminal
-
-
-python main.py

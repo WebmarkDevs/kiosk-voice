@@ -202,4 +202,4 @@ def fetch_sip_trunks():
 # Run the FastAPI app on port 3002
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=3002,reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=3003,reload=True)
