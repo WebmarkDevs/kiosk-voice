@@ -5,3 +5,4 @@ livekit-plugins-silero>=0.7.3
 python-dotenv~=1.0
 composio-openai==0.5.50
 fastapi[standard]
+psutil==5.9.0
