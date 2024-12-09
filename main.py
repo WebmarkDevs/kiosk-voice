@@ -72,7 +72,7 @@ def get_phone_number_sid(phone_number: str):
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
 
-@app.post("/create-phone-number-agent/")
+@app.post("/create-phone-number-agent")
 async def create_phone_number_agent(request: PhoneNumberRequest):
     """Add a phone number to a Twilio trunk and create a SIP trunk."""
     # Validate Twilio credentials
