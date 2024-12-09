@@ -2,3 +2,4 @@
 venv/
 .DS_Store
 *.pyc
+user_phone_mapping.json

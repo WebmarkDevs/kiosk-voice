@@ -1,0 +1,23 @@
+# Dockerfile.main
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# # Install necessary system dependencies
+# RUN apt-get update && apt-get install -y \
+#     build-essential \
+#     python3-dev \
+#     gcc \
+#     libffi-dev \
+#     --no-install-recommends && \
+#     rm -rf /var/lib/apt/lists/*
+
+# Copy application files
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Set the entrypoint
+CMD ["python3", "main.py"]
