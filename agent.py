@@ -35,10 +35,15 @@ def getdata_api(query,userID):
             'Content-Type': 'application/json'
             }
             response = requests.request("POST", url, headers=headers, data=payload)
+            logger.info(f""" #################################################################
+                        {response}
+                        {payload}
+                        """)
             response_data = response.json()
             data = response_data.get("matches", "")
             return data
         except requests.exceptions.RequestException as e:
+            
             print(f"Error occurred: {e}")
             return ''
 def get_prompt( query,userID):
