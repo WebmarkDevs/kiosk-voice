@@ -12,7 +12,7 @@ services:
       - .:/app
     ports:
       - "3001:3001"
-    #platform: linux/arm64  # Specify the ARM64 platform for compatibility
+    platform: linux/arm64  # Specify the ARM64 platform for compatibility
 
   kiosk-voice-main:
     build:
@@ -25,7 +25,7 @@ services:
       - .:/app
     ports:
       - "3003:3003"
-    #platform: linux/arm64  # Specify the ARM64 platform for compatibility
+    platform: linux/arm64  # Specify the ARM64 platform for compatibility
 
 volumes:
   shared-data:
