@@ -11,7 +11,7 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import openai, deepgram, silero
+from livekit.plugins import openai, deepgram, silero,google
 import requests
 from apiHelper import *
 from helper.func_calling import AssistantFnc
@@ -24,28 +24,44 @@ def prewarm(proc: JobProcess):
 # Define a path for the JSON file
 USER_PHONE_MAPPING_FILE = "user_phone_mapping.json"
 
-def getdata_api(query,userID):
-        url = f"https://dev-api.getkiosk.ai/search_pinecone"
-        try:
-            payload = json.dumps({
+import json
+import requests
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def getdata_api(query, userID):
+    url = "https://dev-api.getkiosk.ai/search_pinecone"
+    try:
+        payload = json.dumps({
             "query_text": query,
-            "namespace" : userID
-            })
-            headers = {
+            "namespace": userID
+        })
+        headers = {
             'Content-Type': 'application/json'
-            }
-            response = requests.request("POST", url, headers=headers, data=payload)
-            logger.info(f""" #################################################################
-                        {response}
-                        {payload}
-                        """)
-            response_data = response.json()
-            data = response_data.get("matches", "")
-            return data
-        except requests.exceptions.RequestException as e:
-            
-            print(f"Error occurred: {e}")
-            return ''
+        }
+        response = requests.post(url, headers=headers, data=payload)
+
+        # Log details
+        logger.info(f"Status Code: {response.status_code}")
+        logger.info(f"Request Headers: {headers}")
+        logger.info(f"Request Payload: {payload}")
+        logger.info(f"Response Headers: {response.headers}")
+        logger.info(f"Response Body: {response.text}")
+
+        if response.status_code == 403:
+            logger.error("403 Forbidden: Check your API key, headers, or permissions.")
+        
+        response_data = response.json()
+        data = response_data.get("matches", "")
+        return data
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error occurred: {e}")
+        return ''
+
 def get_prompt( query,userID):
         data = getdata_api(query,userID)
         #self.save_to_json(data)
@@ -84,9 +100,21 @@ def load_user_id_by_phone_number(phone_number: str) -> str:
 async def truncate_context(assistant: VoicePipelineAgent,chat_ctx: llm.ChatContext):
     
     userID = load_user_id_by_phone_number(assistant._participant.attributes['sip.trunkPhoneNumber'])
+    logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
+    print("333"*30)
+    logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
     chat_ctx.messages[0].content = get_prompt(chat_ctx.messages[0].content,userID)
+    
     if len(chat_ctx.messages) > 15:
         chat_ctx.messages = chat_ctx.messages[-15:]
+
+def switchProvider(voice):
+    if voice['voice_provider'] == 'google':
+        return google.TTS()
+    
+    elif voice['voice_provider'] == 'openai':
+        return openai.TTS()
+    
 async def entrypoint(ctx: JobContext):
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -111,11 +139,13 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
     logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+    # user data {voice_provider:'google'|'openai'}
+    voice_config={'voice_provider':'google'}
     assistant = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=openai.TTS(),
+        tts=switchProvider(voice_config),
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
@@ -126,6 +156,8 @@ async def entrypoint(ctx: JobContext):
     await assistant.say(agent_metadata.agent_welcome_message, allow_interruptions=True)
 
 
+
+
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
@@ -133,3 +165,4 @@ if __name__ == "__main__":
             prewarm_fnc=prewarm,
         ),
     )
+
