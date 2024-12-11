@@ -77,8 +77,7 @@ def get_prompt( query,userID):
         1. Answer the query concisely in few words based only on the given context information as a salesman . 
         2. Never mention that you have been trained on or lack context. 
         3. Only if someone greets you, respond with a greeting as the chat assistant for small business name. 
-        4. Do not hallucinate or use any prior knowledge outside of the provided context information. 
-        5. Answer All queries in markdown format only, for the anchor tags it should always render a link, do not render image tag links as anchor . 
+        4. Do not hallucinate or use any prior knowledge outside of the provided context information.  
         6. Use the history and the context to answer the current question only. 
         7. Please respond in a natural, conversational tone, avoiding phrases like "Based on the context provided." 
         8. Your responses should sound as if they are coming from a knowledgeable human rather than a bot. 
@@ -140,7 +139,7 @@ async def entrypoint(ctx: JobContext):
     logger.info(f"starting voice assistant for participant {participant.identity}")
     logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
     # user data {voice_provider:'google'|'openai'}
-    voice_config={'voice_provider':'google'}
+    voice_config={'voice_provider':'openai'}
     assistant = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
