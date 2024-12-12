@@ -21,7 +21,7 @@ from helper.func_calling import AssistantFnc
 load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("voice-agent")
 
-count = 0
+
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 # Define a path for the JSON file
@@ -40,7 +40,7 @@ def getdata_api(query, userID):
     global start
     start = time.time()
     logger.info("START")
-    url = "https://dev-api.getkiosk.ai/search_pinecone"
+    url = os.environ.get("QUERY_API")
     try:
         payload = json.dumps({
             "query_text": query,
@@ -115,7 +115,7 @@ async def get_data_from_supabase(userID:str):
 
 
 def switchProvider(voice_data):
-    if voice_data['voice'] == 'google':
+    if voice_data['voice_provider'] == 'google':
         # logger.info("GOOGLE CREDENTIALS ------------------------->",json.load(os.environ.get('GOOGLE_CREDENTIALS')))
         credentials = {
             "type": os.environ.get("TYPE"),
@@ -133,7 +133,7 @@ def switchProvider(voice_data):
         print("THIS IS ------------",credentials)
         return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
     
-    elif voice_data['voice'] == 'openai':
+    elif voice_data['voice_provider'] == 'openai':
         return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'])
     
 
