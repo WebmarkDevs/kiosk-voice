@@ -1,6 +1,9 @@
 import json
+import os
 import logging
+from supabase import create_client
 from dotenv import load_dotenv
+import time
 from fastapi import HTTPException
 from livekit.agents import (
     AutoSubscribe,
@@ -31,8 +34,12 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+start=0
 
 def getdata_api(query, userID):
+    global start
+    start = time.time()
+    logger.info("START")
     url = "https://dev-api.getkiosk.ai/search_pinecone"
     try:
         payload = json.dumps({
@@ -62,7 +69,7 @@ def getdata_api(query, userID):
         logger.error(f"Error occurred: {e}")
         return ''
 
-def get_prompt( query,userID):
+def get_prompt( query,userID,voice_data):
         data = getdata_api(query,userID)
         #self.save_to_json(data)
         logger.info(f"################### DATA {data}")
@@ -74,18 +81,13 @@ def get_prompt( query,userID):
         User question: [{query}]
         --------------------- 
         Please follow these guidelines when responding to queries: 
-        1. Answer the query concisely in few words based only on the given context information as a salesman . 
-        2. Never mention that you have been trained on or lack context. 
-        3. Only if someone greets you, respond with a greeting as the chat assistant for small business name. 
-        4. Do not hallucinate or use any prior knowledge outside of the provided context information.  
-        6. Use the history and the context to answer the current question only. 
-        7. Please respond in a natural, conversational tone, avoiding phrases like "Based on the context provided." 
-        8. Your responses should sound as if they are coming from a knowledgeable human rather than a bot. 
-        9. Never try to answer the history, only answer the current question.
+        {voice_data['prompt']}
         Answer:
         """
         
         return prompt  
+
+
 # Utility function to load userID by phone number
 def load_user_id_by_phone_number(phone_number: str) -> str:
     """Load userID by phone number from the JSON file."""
@@ -95,24 +97,48 @@ def load_user_id_by_phone_number(phone_number: str) -> str:
         return data.get(phone_number, "UserID not found")
     except FileNotFoundError:
         return "Mapping file not found"
+    
 
-async def truncate_context(assistant: VoicePipelineAgent,chat_ctx: llm.ChatContext):
-    
-    userID = load_user_id_by_phone_number(assistant._participant.attributes['sip.trunkPhoneNumber'])
-    logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
-    print("333"*30)
-    logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
-    chat_ctx.messages[0].content = get_prompt(chat_ctx.messages[0].content,userID)
-    
-    if len(chat_ctx.messages) > 15:
-        chat_ctx.messages = chat_ctx.messages[-15:]
 
-def switchProvider(voice):
-    if voice['voice_provider'] == 'google':
-        return google.TTS()
+async def get_data_from_supabase(userID:str):
+    url: str = os.environ.get("SUPABASE_URL")
+    key: str = os.environ.get("SUPABASE_KEY")
+
+    Client = create_client(url, key)
+
+    voice_configuration = Client.table('voice_config').select('*').eq('user_id',userID).execute()
+
+    voice_data = voice_configuration.data[0]
+
+    return voice_data
+
+
+
+def switchProvider(voice_data):
+    if voice_data['voice'] == 'google':
+        # logger.info("GOOGLE CREDENTIALS ------------------------->",json.load(os.environ.get('GOOGLE_CREDENTIALS')))
+        credentials = {
+            "type": os.environ.get("TYPE"),
+            "project_id": os.environ.get("PROJECT_ID"),
+            "private_key_id": os.environ.get("PRIVATE_KEY_ID"),
+            "private_key": os.environ.get("PRIVATE_KEY"),
+            "client_email": os.environ.get("CLIENT_EMAIL"),
+            "client_id": os.environ.get("CLIENT_ID"),
+            "auth_uri": os.environ.get("AUTH_URI"),
+            "token_uri": os.environ.get("TOKEN_URI"),
+            "auth_provider_x509_cert_url": os.environ.get("AUTH_PROVIDER_X509_CERT_URL"),
+            "client_x509_cert_url": os.environ.get("CLIENT_X509_CERT_URL"),
+            "universe_domain": os.environ.get("UNIVERSE_DOMAIN"),
+        }
+        print("THIS IS ------------",credentials)
+        return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
     
-    elif voice['voice_provider'] == 'openai':
-        return openai.TTS()
+    elif voice_data['voice'] == 'openai':
+        return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'])
+    
+
+
+
     
 async def entrypoint(ctx: JobContext):
     logger.info(f"connecting to room {ctx.room.name}")
@@ -121,7 +147,10 @@ async def entrypoint(ctx: JobContext):
     logger.info(f"starting voice assistant for participant {participant.identity}")
     logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
     agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
+    # supabase se data
+    
 
+    
     initial_ctx = llm.ChatContext().append(
         role="system",
         text=(
@@ -132,28 +161,47 @@ async def entrypoint(ctx: JobContext):
         ),
     )
 
+    userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+
+
+    voice_data = await get_data_from_supabase(userID)
+
+
+    async def truncate_context(assistant: VoicePipelineAgent,chat_ctx: llm.ChatContext):
+        
+        logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
+        print("333"*30)
+        logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
+        chat_ctx.messages[0].content = get_prompt(chat_ctx.messages[0].content,userID,voice_data)
+        
+        if len(chat_ctx.messages) > 15:
+            chat_ctx.messages = chat_ctx.messages[-15:]
+
+        end = time.time()
+        logger.info("TOTAL TIME TAKEN",end-start)
+
     
+
     fnc_ctx = AssistantFnc()
     # Wait for the first participant to connect
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
     logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
     # user data {voice_provider:'google'|'openai'}
-    voice_config={'voice_provider':'openai'}
+
     assistant = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=switchProvider(voice_config),
+        tts=switchProvider(voice_data),
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
         before_llm_cb=truncate_context
     )
     assistant.start(ctx.room, participant)
-
+    
     await assistant.say(agent_metadata.agent_welcome_message, allow_interruptions=True)
-
 
 
 
