@@ -21,7 +21,7 @@ from helper.func_calling import AssistantFnc
 load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("voice-agent")
 
-
+count = 0
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 # Define a path for the JSON file
@@ -106,7 +106,7 @@ async def get_data_from_supabase(userID:str):
 
     Client = create_client(url, key)
 
-    voice_configuration = Client.table('voice_config').select('*').eq('user_id',userID).execute()
+    voice_configuration = Client.table('voice_config').select('*').eq('chatbot_id',userID).execute()
 
     voice_data = voice_configuration.data[0]
 
@@ -162,9 +162,8 @@ async def entrypoint(ctx: JobContext):
     )
 
     userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
-
-
     voice_data = await get_data_from_supabase(userID)
+    
 
 
     async def truncate_context(assistant: VoicePipelineAgent,chat_ctx: llm.ChatContext):
