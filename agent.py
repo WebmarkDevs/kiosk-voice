@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+from DB import Singelton_db
 from supabase import create_client
 from dotenv import load_dotenv
 import time
@@ -97,21 +98,6 @@ def load_user_id_by_phone_number(phone_number: str) -> str:
         return data.get(phone_number, "UserID not found")
     except FileNotFoundError:
         return "Mapping file not found"
-    
-
-
-async def get_data_from_supabase(userID:str):
-    url: str = os.environ.get("SUPABASE_URL")
-    key: str = os.environ.get("SUPABASE_KEY")
-
-    Client = create_client(url, key)
-
-    voice_configuration = Client.table('voice_config').select('*').eq('chatbot_id',userID).execute()
-
-    voice_data = voice_configuration.data[0]
-
-    return voice_data
-
 
 
 def switchProvider(voice_data):
@@ -162,7 +148,7 @@ async def entrypoint(ctx: JobContext):
     )
 
     userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
-    voice_data = await get_data_from_supabase(userID)
+    voice_data = await Singelton_db.get_data_from_supabase(userID)
     
 
 
