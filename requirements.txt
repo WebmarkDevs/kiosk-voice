@@ -17,3 +17,4 @@ composio-openai
 fastapi[standard]
 # psutil==5.9.0
 livekit-plugins-google
+supabase>=2.7.3
