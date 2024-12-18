@@ -1,7 +1,19 @@
-livekit-agents>=0.11.2
-livekit-plugins-openai>=0.10.6
-livekit-plugins-deepgram>=0.6.9
-livekit-plugins-silero>=0.7.3
-python-dotenv~=1.0
-composio-openai==0.5.50
+# livekit-agents>=0.11.2
+# livekit-plugins-openai>=0.10.6
+# livekit-plugins-deepgram>=0.6.9
+# livekit-plugins-silero>=0.7.3
+# python-dotenv~=1.0
+# composio-openai==0.5.50
+# fastapi[standard]
+# # psutil==5.9.0
+# livekit-plugins-google
+
+livekit-agents
+livekit-plugins-openai
+livekit-plugins-deepgram
+livekit-plugins-silero
+python-dotenv
+composio-openai
 fastapi[standard]
+# psutil==5.9.0
+livekit-plugins-google

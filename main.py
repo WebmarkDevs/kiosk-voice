@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from livekit import api
 import os
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 from requests.auth import HTTPBasicAuth
@@ -27,6 +28,14 @@ AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TRUNK_SID = os.getenv("TRUNK_SID")
 # Define a path for the JSON file
 USER_PHONE_MAPPING_FILE = "user_phone_mapping.json"
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # List of allowed origins. Use ["*"] to allow all.
+    allow_credentials=True,  # Whether to allow cookies and credentials
+    allow_methods=["*"],  # List of HTTP methods to allow (e.g., GET, POST). Use ["*"] to allow all.
+    allow_headers=["*"],  # List of HTTP headers to allow. Use ["*"] to allow all.
+)
 
 # Utility function to save userID and phone number
 def save_user_phone_mapping(phone_number: str, user_id: str):
@@ -63,7 +72,7 @@ def get_phone_number_sid(phone_number: str):
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
 
-@app.post("/create-phone-number-agent/")
+@app.post("/create-phone-number-agent")
 async def create_phone_number_agent(request: PhoneNumberRequest):
     """Add a phone number to a Twilio trunk and create a SIP trunk."""
     # Validate Twilio credentials
@@ -202,4 +211,4 @@ def fetch_sip_trunks():
 # Run the FastAPI app on port 3002
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=3002,reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=3003,reload=True)

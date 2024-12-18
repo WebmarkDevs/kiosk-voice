@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  kiosk-voice-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    environment:
+      - ENV=dev
+    volumes:
+      - shared-data:/app/shared
+    ports:
+      - "3001:3001"
+    #platform: linux/arm64  # Specify the ARM64 platform for compatibility
+
+  kiosk-voice-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.main
+    environment:
+      - ENV=dev
+    volumes:
+      - shared-data:/app/shared
+    ports:
+      - "3003:3003"
+    #platform: linux/arm64  # Specify the ARM64 platform for compatibility
+
+volumes:
+  shared-data:
