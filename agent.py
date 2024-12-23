@@ -73,7 +73,6 @@ def getdata_api(query, userID):
 def get_prompt( query,userID,voice_data):
         data = getdata_api(query,userID)
         #self.save_to_json(data)
-        logger.info(f"################### DATA {data}")
         prompt = f"""
         Context information is below.
         ---------------------
@@ -131,23 +130,48 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
-    logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
-    agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
-    # supabase se data
-    
 
-    
-    initial_ctx = llm.ChatContext().append(
-        role="system",
-        text=(
+
+
+
+
+    if participant.identity == 'voice':
+        userID = participant.attributes['chatbot_id']
+        logger.info('---------------------inside livekit voice------------------------------')
+        logger.info(f"this is chabotId------>   {participant.attributes['chatbot_id']}")
+        logger.info("--"*40)
+        message= (
+            f'You are a helpful AI assistant focused on customer service.'
+            f"Use this information for calling functions that use UserID. UserID = {userID}"
+            "Do not provide userID to the user under any circumstances."
+            "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
+        )
+
+
+
+    else:
+        logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+        agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
+        userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+        message = (
             f"{agent_metadata.agent_prompts}"
             f"Use this information for calling functions that use UserID. UserID = {agent_metadata.userID}"
             "Do not provide userID to the user under any circumstances."
             "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
-        ),
+        )
+    
+
+
+    
+    # supabase se data
+    
+    initial_ctx = llm.ChatContext().append(
+        role="system",
+        text=message,
     )
 
-    userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+    # userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+
     voice_data = await Singelton_db.get_data_from_supabase(userID)
     
 
@@ -170,8 +194,8 @@ async def entrypoint(ctx: JobContext):
     fnc_ctx = AssistantFnc()
     # Wait for the first participant to connect
     participant = await ctx.wait_for_participant()
-    logger.info(f"starting voice assistant for participant {participant.identity}")
-    logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+    # logger.info(f"starting voice assistant for participant {participant.identity}")
+    # logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
     # user data {voice_provider:'google'|'openai'}
 
     assistant = VoicePipelineAgent(
@@ -186,7 +210,7 @@ async def entrypoint(ctx: JobContext):
     )
     assistant.start(ctx.room, participant)
     
-    await assistant.say(agent_metadata.agent_welcome_message, allow_interruptions=True)
+    await assistant.say("hello how are you, how can i help you", allow_interruptions=True)
 
 
 

@@ -1,5 +1,9 @@
 import os
 from supabase import create_client
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Singelton_db:
     _instance =None
@@ -18,6 +22,7 @@ class Singelton_db:
 
             Client = create_client(url, key)
             voice_configuration = Client.table('voice_config').select('*').eq('chatbot_id',userID).execute()
+            logger.info("voice configuration is ----->>>    ",voice_configuration)
             cls._voice_data = voice_configuration.data[0]
 
             return cls._voice_data
