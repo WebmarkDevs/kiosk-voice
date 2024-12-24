@@ -135,14 +135,14 @@ async def entrypoint(ctx: JobContext):
 
 
 
-    if participant.identity == 'voice':
-        userID = participant.attributes['chatbot_id']
-        logger.info('---------------------inside livekit voice------------------------------')
-        logger.info(f"this is chabotId------>   {participant.attributes['chatbot_id']}")
-        logger.info("--"*40)
-        message= (
-            f'You are a helpful AI assistant focused on customer service.'
-            f"Use this information for calling functions that use UserID. UserID = {userID}"
+    if "sip.trunkPhoneNumber" in participant.attributes:
+
+        logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+        agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
+        userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+        message = (
+            f"{agent_metadata.agent_prompts}"
+            f"Use this information for calling functions that use UserID. UserID = {agent_metadata.userID}"
             "Do not provide userID to the user under any circumstances."
             "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
         )
@@ -150,12 +150,14 @@ async def entrypoint(ctx: JobContext):
 
 
     else:
-        logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
-        agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
-        userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
-        message = (
-            f"{agent_metadata.agent_prompts}"
-            f"Use this information for calling functions that use UserID. UserID = {agent_metadata.userID}"
+
+        userID = participant.attributes['chatbot_id']
+        logger.info('---------------------inside livekit voice------------------------------')
+        logger.info(f"this is chabotId------>   {participant.attributes['chatbot_id']}")
+        logger.info("--"*40)
+        message= (
+            f'You are a helpful AI assistant focused on customer service.'
+            f"Use this information for calling functions that use UserID. UserID = {userID}"
             "Do not provide userID to the user under any circumstances."
             "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
         )
@@ -210,7 +212,7 @@ async def entrypoint(ctx: JobContext):
     )
     assistant.start(ctx.room, participant)
     
-    await assistant.say("hello how are you, how can i help you", allow_interruptions=True)
+    await assistant.say(voice_data['welcome_message'], allow_interruptions=True)
 
 
 
