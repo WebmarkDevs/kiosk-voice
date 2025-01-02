@@ -54,8 +54,12 @@ async def entrypoint(ctx: JobContext):
     @agent.on("metrics_collected")
     def _on_metrics_collected(mtrcs: metrics.AgentMetrics):
         # Use this helper to format and log based on metrics type
-        # metrics.log_metrics(mtrcs)
-        metrics.log_metrics(metrics.PipelineLLMMetrics)
+        metrics.log_metrics(mtrcs)
+        print("++"*30)
+        # metrics.log_metrics(metrics.STTMetrics)
+        print("//"*30)
+        # metrics.log_metrics(metrics.TTSMetrics)
+
 
     
         # print("STT duration ------>>>>>",metrics.PipelineSTTMetrics.duration)

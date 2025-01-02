@@ -16,7 +16,7 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import openai, deepgram, silero,google
+from livekit.plugins import openai, deepgram, silero,google, elevenlabs
 import requests
 from apiHelper import *
 from helper.func_calling import AssistantFnc
@@ -206,7 +206,8 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=switchProvider(voice_data),
+        # tts=switchProvider(voice_data),
+        tts = elevenlabs.TTS()
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
@@ -220,8 +221,8 @@ async def entrypoint(ctx: JobContext):
     def _on_metrics_collected(mtrcs: metrics.AgentMetrics):
         # Use this helper to format and log based on metrics type
         metrics.log_metrics(mtrcs)
-        
-        print(mtrcs.ttfb)
+        print("++"*30)
+        print("//"*30)
     
     # await assistant.say(voice_data['welcome_message'], allow_interruptions=True)
     await assistant.say("hey how can i help you karan", allow_interruptions=True)
