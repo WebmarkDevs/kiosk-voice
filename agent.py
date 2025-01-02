@@ -1,6 +1,12 @@
+import json
+import os
 import logging
-from livekit.agents import metrics
+from DB import Singelton_db
+from supabase import create_client
 from dotenv import load_dotenv
+import time
+from livekit.agents import metrics
+from fastapi import HTTPException
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
@@ -10,73 +16,217 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import openai, deepgram, silero, elevenlabs
-
-
+from livekit.plugins import openai, deepgram, silero,google, elevenlabs
+import requests
+from apiHelper import *
+from helper.func_calling import AssistantFnc
 load_dotenv(dotenv_path=".env.local")
 logger = logging.getLogger("voice-agent")
 
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
+# Define a path for the JSON file
+USER_PHONE_MAPPING_FILE = "user_phone_mapping.json"
+
+import json
+import requests
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+start=0
+
+def getdata_api(query, userID):
+    global start
+    start = time.time()
+    logger.info("START")
+    url = os.environ.get("QUERY_API")
+    try:
+        payload = json.dumps({
+            "query_text": query,
+            "namespace": userID
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        response = requests.post(url, headers=headers, data=payload)
+
+        # Log details
+        logger.info(f"Status Code: {response.status_code}")
+        logger.info(f"Request Headers: {headers}")
+        logger.info(f"Request Payload: {payload}")
+        logger.info(f"Response Headers: {response.headers}")
+        logger.info(f"Response Body: {response.text}")
+
+        if response.status_code == 403:
+            logger.error("403 Forbidden: Check your API key, headers, or permissions.")
+        
+        response_data = response.json()
+        data = response_data.get("matches", "")
+        return data
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error occurred: {e}")
+        return ''
+
+def get_prompt( query,userID,voice_data):
+        data = getdata_api(query,userID)
+        #self.save_to_json(data)
+        prompt = f"""
+        Context information is below.
+        ---------------------
+        {data}
+        ---------------------
+        User question: [{query}]
+        --------------------- 
+        Please follow these guidelines when responding to queries: 
+        {voice_data['prompt']}
+        Answer:
+        """
+        
+        return prompt  
 
 
+# Utility function to load userID by phone number
+def load_user_id_by_phone_number(phone_number: str) -> str:
+    """Load userID by phone number from the JSON file."""
+    try:
+        with open(USER_PHONE_MAPPING_FILE, "r") as file:
+            data = json.load(file)
+        return data.get(phone_number, "UserID not found")
+    except FileNotFoundError:
+        return "Mapping file not found"
+
+
+def switchProvider(voice_data):
+    if voice_data['voice_provider'] == 'google':
+        # logger.info("GOOGLE CREDENTIALS ------------------------->",json.load(os.environ.get('GOOGLE_CREDENTIALS')))
+        credentials = {
+            "type": os.environ.get("TYPE"),
+            "project_id": os.environ.get("PROJECT_ID"),
+            "private_key_id": os.environ.get("PRIVATE_KEY_ID"),
+            "private_key": os.environ.get("PRIVATE_KEY"),
+            "client_email": os.environ.get("CLIENT_EMAIL"),
+            "client_id": os.environ.get("CLIENT_ID"),
+            "auth_uri": os.environ.get("AUTH_URI"),
+            "token_uri": os.environ.get("TOKEN_URI"),
+            "auth_provider_x509_cert_url": os.environ.get("AUTH_PROVIDER_X509_CERT_URL"),
+            "client_x509_cert_url": os.environ.get("CLIENT_X509_CERT_URL"),
+            "universe_domain": os.environ.get("UNIVERSE_DOMAIN"),
+        }
+        print("THIS IS ------------",credentials)
+        return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
+    
+    elif voice_data['voice_provider'] == 'openai':
+        return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'])
+    
+
+
+
+    
 async def entrypoint(ctx: JobContext):
-    initial_ctx = llm.ChatContext().append(
-        role="system",
-        text=(
-            "You are a voice assistant created by LiveKit. Your interface with users will be voice. "
-            "You should use short and concise responses, and avoiding usage of unpronouncable punctuation. "
-            "You were created as a demo to showcase the capabilities of LiveKit's agents framework."
-        ),
-    )
-
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-
-    # Wait for the first participant to connect
     participant = await ctx.wait_for_participant()
     logger.info(f"starting voice assistant for participant {participant.identity}")
 
-    # This project is configured to use Deepgram STT, OpenAI LLM and TTS plugins
-    # Other great providers exist like Cartesia and ElevenLabs
-    # Learn more and pick the best one for your app:
-    # https://docs.livekit.io/agents/plugins
-    agent = VoicePipelineAgent(
+
+
+
+
+    if "sip.trunkPhoneNumber" in participant.attributes:
+
+        logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+        agent_metadata =  await get_metadata_by_number(participant.attributes['sip.trunkPhoneNumber'])
+        userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+        message = (
+            f"{agent_metadata.agent_prompts}"
+            f"Use this information for calling functions that use UserID. UserID = {agent_metadata.userID}"
+            "Do not provide userID to the user under any circumstances."
+            "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
+        )
+
+
+
+    else:
+
+        userID = participant.attributes['chatbot_id']
+        logger.info('---------------------inside livekit voice------------------------------')
+        logger.info(f"this is chabotId------>   {participant.attributes['chatbot_id']}")
+        logger.info("--"*40)
+        message= (
+            f'You are a helpful AI assistant focused on customer service.'
+            f"Use this information for calling functions that use UserID. UserID = {userID}"
+            "Do not provide userID to the user under any circumstances."
+            "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
+        )
+    
+
+
+    
+    # supabase se data
+    
+    initial_ctx = llm.ChatContext().append(
+        role="system",
+        text=message,
+    )
+
+    # userID = load_user_id_by_phone_number(participant.attributes['sip.trunkPhoneNumber'])
+
+    # this is supabase voice_data
+    voice_data = await Singelton_db.get_data_from_supabase(userID)
+    
+
+
+    async def truncate_context(assistant: VoicePipelineAgent,chat_ctx: llm.ChatContext):
+        
+        logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
+        print("333"*30)
+        logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
+        chat_ctx.messages[0].content = get_prompt(chat_ctx.messages[0].content,userID,voice_data)
+        
+        if len(chat_ctx.messages) > 15:
+            chat_ctx.messages = chat_ctx.messages[-15:]
+
+        end = time.time()
+        logger.info("TOTAL TIME TAKEN",end-start)
+
+    
+
+    fnc_ctx = AssistantFnc()
+    # Wait for the first participant to connect
+    participant = await ctx.wait_for_participant()
+    # logger.info(f"starting voice assistant for participant {participant.identity}")
+    # logger.info(f"Caller phone number is {participant.attributes['sip.trunkPhoneNumber']}")
+    # user data {voice_provider:'google'|'openai'}
+
+    assistant = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=elevenlabs.TTS(),
+        # tts=switchProvider(voice_data),
+        tts = elevenlabs.TTS(),
         chat_ctx=initial_ctx,
+        fnc_ctx=fnc_ctx,
+        max_nested_fnc_calls=1,
+        before_llm_cb=truncate_context,
+        interrupt_min_words = 2,
+        preemptive_synthesis=True, 
+        min_endpointing_delay=0
     )
-
-    agent.start(ctx.room, participant)
-    @agent.on("metrics_collected")
+    assistant.start(ctx.room, participant)
+    @assistant.on("metrics_collected")
     def _on_metrics_collected(mtrcs: metrics.AgentMetrics):
         # Use this helper to format and log based on metrics type
         metrics.log_metrics(mtrcs)
         print("++"*30)
-        # metrics.log_metrics(metrics.STTMetrics)
         print("//"*30)
-        # metrics.log_metrics(metrics.TTSMetrics)
-
-
     
-        # print("STT duration ------>>>>>",metrics.PipelineSTTMetrics.duration)
-        # print("====================================================================")
-        # print("LLM ttft ------>>>>>",metrics.LLMMetrics.ttft)
-        # print("LLM input tokens   ------>>>>>",metrics.LLMMetrics.total_tokens)
-        # print("LLM output tokens  ------>>>>>",metrics.LLMMetrics.completion_tokens)
-        # print("LLM tokens per seconds   ------>>>>>",metrics.LLMMetrics.tokens_per_second)
+    # await assistant.say(voice_data['welcome_message'], allow_interruptions=True)
+    await assistant.say(voice_data['welcome_message'], allow_interruptions=True)
 
-        # print("=================================================================")
-
-        # print("TTS ttfb ------>>>>>",metrics.TTSMetrics.ttfb)
-        # print("TTS audio_duration ------>>>>>",metrics.TTSMetrics.audio_duration)
-
-
-    # The agent should be polite and greet the user when it joins :)
-    await agent.say("Hey, how can I help you today?", allow_interruptions=True)
 
 
 if __name__ == "__main__":
@@ -86,3 +236,4 @@ if __name__ == "__main__":
             prewarm_fnc=prewarm,
         ),
     )
+
