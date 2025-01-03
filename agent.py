@@ -212,7 +212,6 @@ async def entrypoint(ctx: JobContext):
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
         before_llm_cb=truncate_context,
-        interrupt_min_words = 2,
         preemptive_synthesis=True, 
         min_endpointing_delay=0
     )
