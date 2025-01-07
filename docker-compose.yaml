@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   kiosk-voice-agent:
@@ -8,11 +8,11 @@ services:
     environment:
       - ENV=dev
     volumes:
-      - shared-data:/shared-data  # Shared volume
+      - shared-data:/shared-data # Shared volume
       - .:/app
     ports:
       - "3001:3001"
-    platform: linux/arm64  # Specify the ARM64 platform for compatibility
+    platform: linux/arm64 # Specify the ARM64 platform for compatibility
 
   kiosk-voice-main:
     build:
@@ -21,11 +21,11 @@ services:
     environment:
       - ENV=dev
     volumes:
-      - shared-data:/shared-data  # Shared volume
+      - shared-data:/shared-data # Shared volume
       - .:/app
     ports:
-      - "3003:3003"
-    platform: linux/arm64  # Specify the ARM64 platform for compatibility
+      - "3004:3003"
+    platform: linux/arm64 # Specify the ARM64 platform for compatibility
 
 volumes:
   shared-data:
