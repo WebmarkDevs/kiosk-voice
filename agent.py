@@ -283,7 +283,7 @@ async def entrypoint(ctx: JobContext):
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
         # tts=switchProvider(voice_data),
-        tts = openai.TTS(),
+        tts = elevenlabs.TTS(),
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
