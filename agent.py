@@ -15,6 +15,8 @@ from livekit.agents import (
     cli,
     llm,
 )
+from pinecone import Pinecone
+from openai import OpenAI
 from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import openai, deepgram, silero,google, elevenlabs
 import requests
@@ -36,48 +38,122 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-start=0
+sstart=0
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+client = OpenAI()  
 
-def getdata_api(query, userID):
-    global start
-    start = time.time()
-    logger.info("START")
-    url = os.environ.get("QUERY_API")
+async def getdata_api(query, namespace):
+    top_k = 10 # Default number of results to return
+    global sstart
+    sstart = time.time()
     try:
-        payload = json.dumps({
-            "query_text": query,
-            "namespace": userID
-        })
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        response = requests.post(url, headers=headers, data=payload)
-
-        # Log details
-        logger.info(f"Status Code: {response.status_code}")
-        logger.info(f"Request Headers: {headers}")
-        logger.info(f"Request Payload: {payload}")
-        logger.info(f"Response Headers: {response.headers}")
-        logger.info(f"Response Body: {response.text}")
-
-        if response.status_code == 403:
-            logger.error("403 Forbidden: Check your API key, headers, or permissions.")
+        # Initialize Pinecone client
+        index_name = os.getenv("PINECONE_INDEX_NAME")
         
-        response_data = response.json()
-        data = response_data.get("matches", "")
-        return data
+        print(pc.list_indexes().names())
+        # Connect to index
+        if index_name not in pc.list_indexes().names():
+            return {"error": f"Index '{index_name}' does not exist", "statusCode": 404}
+        start = time.time()   
+        index = pc.Index(index_name)
+        
+        # Generate embedding for query
+        # client = openai.OpenAI()
+        response = client.embeddings.create(
+            input=query,
+            model="text-embedding-ada-002"
+        )
+        query_embedding = response.data[0].embedding
+        # logger.info(query_embedding,"THIS IS THE QUERY EMBEDDING")
+        end3 = time.time()
+        logger.info("Embedding the input",end3-start)
+        # Query Pinecone
+        start = time.time()
+        result = index.query(
+            vector=query_embedding,
+            top_k=top_k,
+            include_metadata=True,
+            namespace=namespace,
+            )
+        end2 = time.time()
+        print("&&&"*30)
+        logger.info("result query time",end2-start)
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error occurred: {e}")
-        return ''
+        # logger.info(f"Query result: {result}")
+        # Convert to dictionary if possible
+        result_dict = result.to_dict()
+        # logger.info(result_dict,"THIS IS THE RESULT DICT")
 
-def get_prompt( query,userID,voice_data):
-        data = getdata_api(query,userID)
+        matches = result_dict.get("matches", [])
+
+        matched_arr = matches
+
+        list_of_text=[]
+        metadata=[]
+
+        for match in matched_arr:
+            list_of_text.append(match['metadata']['text'])
+            if 'url' in match['metadata']:
+                metadata.append(match['metadata']['url'])
+
+        # print(list_of_text)
+        # print(metadata)
+        end = time.time()
+        logger.info("===="*40)
+        logger.info("** TIME TAKEN **",end-start)
+        return {"matches": list_of_text, "statusCode": 200,"metadata":metadata}
+        
+    except Exception as e:
+        print('error-------------------',e)
+        return {"error": str(e), "statusCode": 500}
+
+# def getdata_api(query, userID):
+#     global start
+#     start = time.time()
+#     logger.info("START")
+#     url = os.environ.get("QUERY_API")
+#     try:
+#         payload = json.dumps({
+#             "query_text": query,
+#             "namespace": userID
+#         })
+#         headers = {
+#             'Content-Type': 'application/json'
+#         }
+#         response = requests.post(url, headers=headers, data=payload)
+
+#         # Log details
+#         logger.info(f"Status Code: {response.status_code}")
+#         logger.info(f"Request Headers: {headers}")
+#         logger.info(f"Request Payload: {payload}")
+#         logger.info(f"Response Headers: {response.headers}")
+#         logger.info(f"Response Body: {response.text}")
+
+#         if response.status_code == 403:
+#             logger.error("403 Forbidden: Check your API key, headers, or permissions.")
+        
+#         response_data = response.json()
+#         data = response_data.get("matches", "")
+#         return data
+
+#     except requests.exceptions.RequestException as e:
+#         logger.error(f"Error occurred: {e}")
+#         return ''
+
+async def get_prompt(instructions,query,userID,voice_data):
+        data = await getdata_api(query,userID)
+        if data['statusCode'] == 500:
+            print("Error is ------>>>>>",data['error'])
+            return "sorry i have no content"
+        
         #self.save_to_json(data)
         prompt = f"""
+        Instructions you have to follow
+        {instructions}
+        ---------------------------
         Context information is below.
         ---------------------
-        {data}
+        {data['matches']}
         ---------------------
         User question: [{query}]
         --------------------- 
@@ -157,7 +233,7 @@ async def entrypoint(ctx: JobContext):
         logger.info(f"this is chabotId------>   {participant.attributes['chatbot_id']}")
         logger.info("--"*40)
         message= (
-            f'You are a helpful AI assistant focused on customer service.'
+            f'You are a helpful AI voice assistant focused on customer service.'
             f"Use this information for calling functions that use UserID. UserID = {userID}"
             "Do not provide userID to the user under any circumstances."
             "When a user wants to perform a function calling, help them generate relevant information, don't ask too many questions."
@@ -185,13 +261,13 @@ async def entrypoint(ctx: JobContext):
         logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
         print("333"*30)
         logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
-        chat_ctx.messages[0].content = get_prompt(chat_ctx.messages[0].content,userID,voice_data)
+        chat_ctx.messages[0].content = await get_prompt(chat_ctx.messages[0].content,chat_ctx.messages[-1].content,userID,voice_data)
         
         if len(chat_ctx.messages) > 15:
             chat_ctx.messages = chat_ctx.messages[-15:]
 
         end = time.time()
-        logger.info("TOTAL TIME TAKEN",end-start)
+        logger.info("TOTAL TIME TAKEN",end-sstart)
 
     
 
