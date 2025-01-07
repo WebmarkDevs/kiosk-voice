@@ -24,7 +24,7 @@ services:
       - shared-data:/shared-data # Shared volume
       - .:/app
     ports:
-      - "3004:3003"
+      - "3005:3003"
     platform: linux/arm64 # Specify the ARM64 platform for compatibility
 
 volumes:
