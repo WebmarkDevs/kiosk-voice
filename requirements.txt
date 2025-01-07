@@ -19,3 +19,7 @@ fastapi[standard]
 livekit-plugins-google
 supabase>=2.7.3
 livekit-plugins-elevenlabs
+openai
+pinecone[grpc]
+
+
