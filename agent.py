@@ -50,7 +50,6 @@ async def getdata_api(query, namespace):
         # Initialize Pinecone client
         index_name = os.getenv("PINECONE_INDEX_NAME")
         
-        print(pc.list_indexes().names())
         # Connect to index
         if index_name not in pc.list_indexes().names():
             return {"error": f"Index '{index_name}' does not exist", "statusCode": 404}
@@ -59,9 +58,16 @@ async def getdata_api(query, namespace):
         
         # Generate embedding for query
         # client = openai.OpenAI()
-        response = client.embeddings.create(
-            input=query,
-            model="text-embedding-ada-002"
+        # response = client.embeddings.create(
+        #     input=query,
+        #     model="text-embedding-ada-002"
+        # )
+        response = pc.inference.embed(
+            model="multilingual-e5-large",
+            inputs=[query],
+            parameters={
+                "input_type": "query"
+            }
         )
         query_embedding = response.data[0].embedding
         # logger.info(query_embedding,"THIS IS THE QUERY EMBEDDING")
@@ -99,7 +105,7 @@ async def getdata_api(query, namespace):
         # print(list_of_text)
         # print(metadata)
         end = time.time()
-        logger.info("===="*40)
+        # logger.info("===="*40)
         logger.info("** TIME TAKEN **",end-start)
         return {"matches": list_of_text, "statusCode": 200,"metadata":metadata}
         
@@ -263,13 +269,15 @@ async def entrypoint(ctx: JobContext):
         logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
         chat_ctx.messages[0].content = await get_prompt(chat_ctx.messages[0].content,chat_ctx.messages[-1].content,userID,voice_data)
         
-        if len(chat_ctx.messages) > 15:
-            chat_ctx.messages = chat_ctx.messages[-15:]
 
         end = time.time()
         logger.info("TOTAL TIME TAKEN",end-sstart)
 
-    
+
+        if len(chat_ctx.messages) > 15:
+            chat_ctx.messages = chat_ctx.messages[-15:]
+
+       
 
     fnc_ctx = AssistantFnc()
     # Wait for the first participant to connect
