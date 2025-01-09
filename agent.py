@@ -163,6 +163,13 @@ async def get_prompt(instructions,query,userID,voice_data):
         Instructions you have to follow
         {instructions}
         ---------------------------
+        Important instructions
+
+        Rewrite this context information given below to make it engaging and emotionally expressive, suitable for text-to-speech conversion.
+        Ensure it sounds like a natural and empathetic human is speaking, rather than a robot. Use a conversational and warm tone, add natural pauses, and infuse a sense of enthusiasm and care where appropriate.
+        Avoid altering the original meaning or content. Highlight the essence of each section with descriptive and vivid language to capture the listener's attention.
+        Ensure clarity and rhythm in the text to make it pleasant and relatable for all listener
+        --------------------------
         Context information is below.
         ---------------------
         {data['matches']}
@@ -210,12 +217,9 @@ def switchProvider(voice_data):
         # return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
     
     elif voice_data['voice_provider'] == 'openai':
-        return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'])
+        return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'],model='tts-1-hd')
     
 
-
-
-    
 async def entrypoint(ctx: JobContext):
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -298,7 +302,7 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=switchProvider("google"),
+        tts=deepgram.TTS(),
         # tts = elevenlabs.TTS(),
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
