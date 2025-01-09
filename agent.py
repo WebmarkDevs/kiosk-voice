@@ -58,17 +58,12 @@ async def getdata_api(query, namespace):
         
         # Generate embedding for query
         # client = openai.OpenAI()
-        # response = client.embeddings.create(
-        #     input=query,
-        #     model="text-embedding-ada-002"
-        # )
-        response = pc.inference.embed(
-            model="multilingual-e5-large",
-            inputs=[query],
-            parameters={
-                "input_type": "query"
-            }
+
+        response = client.embeddings.create(
+            input=query,
+            model="text-embedding-ada-002"
         )
+
         query_embedding = response.data[0].embedding
         # logger.info(query_embedding,"THIS IS THE QUERY EMBEDDING")
         end3 = time.time()
@@ -148,9 +143,20 @@ async def getdata_api(query, namespace):
 
 async def get_prompt(instructions,query,userID,voice_data):
         data = await getdata_api(query,userID)
-        if data['statusCode'] == 500:
+        print("___________________________________________________________")
+        print(data["statusCode"])
+        if data['statusCode'] == 500 :
             print("Error is ------>>>>>",data['error'])
             return "sorry i have no content"
+        
+        elif data["statusCode"] == 404:
+            return """🚨 Critical Alert: System Issue 🚨\n
+
+                    We regret to inform you that our system is currently facing technical difficulties and cannot process your request at this moment.\n
+
+                    🔴 Action Required: Please try again later or contact our support team immediately for further assistance.\n
+
+                    We sincerely apologize for the inconvenience and appreciate your patience as we work to resolve this issue promptly."""
         
         #self.save_to_json(data)
         prompt = f"""
@@ -183,7 +189,7 @@ def load_user_id_by_phone_number(phone_number: str) -> str:
 
 
 def switchProvider(voice_data):
-    if voice_data['voice_provider'] == 'google':
+    if voice_data == 'google':
         # logger.info("GOOGLE CREDENTIALS ------------------------->",json.load(os.environ.get('GOOGLE_CREDENTIALS')))
         credentials = {
             "type": os.environ.get("TYPE"),
@@ -199,7 +205,8 @@ def switchProvider(voice_data):
             "universe_domain": os.environ.get("UNIVERSE_DOMAIN"),
         }
         print("THIS IS ------------",credentials)
-        return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
+        return google.TTS(credentials_info=credentials)
+        # return google.TTS(voice_name=voice_data['voice_type'],credentials_info=credentials,speaking_rate=voice_data['speed'])
     
     elif voice_data['voice_provider'] == 'openai':
         return openai.TTS(voice=voice_data['voice_type'],speed=voice_data['speed'])
@@ -290,8 +297,8 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o-mini"),
-        # tts=switchProvider(voice_data),
-        tts = elevenlabs.TTS(),
+        tts=switchProvider("google"),
+        # tts = elevenlabs.TTS(),
         chat_ctx=initial_ctx,
         fnc_ctx=fnc_ctx,
         max_nested_fnc_calls=1,
