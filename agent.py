@@ -106,10 +106,11 @@ async def get_prompt(instructions,query,userID,voice_data):
         print(data["statusCode"])
         if data['statusCode'] == 500 :
             print("Error is ------>>>>>",data['error'])
-            return "error500"
+            return "error"
         
         elif data["statusCode"] == 404:
-            return 'error404'
+            return 'error'
+
         #self.save_to_json(data)
         prompt = f"""
         Instructions you have to follow
@@ -198,7 +199,16 @@ async def entrypoint(ctx: JobContext):
         
         logger.info("this the zeroth index ------>",chat_ctx.messages[0].content)
         logger.info("this is index number -1 ------>",chat_ctx.messages[-1].content)
-        chat_ctx.messages[0].content = await get_prompt(chat_ctx.messages[0].content,chat_ctx.messages[-1].content,userID,voice_data)
+
+        result = await get_prompt(chat_ctx.messages[0].content,chat_ctx.messages[-1].content,userID,voice_data)
+
+        if result == 'error':
+
+            chat_ctx.messages[-1].content = voice_data['error_message']
+
+        else:
+
+            chat_ctx.messages[0].content = result
         
 
         end = time.time()
