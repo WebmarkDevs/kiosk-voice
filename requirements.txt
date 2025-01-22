@@ -22,4 +22,3 @@ livekit-plugins-elevenlabs
 openai
 pinecone[grpc]
 
-
