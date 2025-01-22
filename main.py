@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 from requests.auth import HTTPBasicAuth
+from fastapi.responses import JSONResponse
 # Load environment variables
 load_dotenv(dotenv_path=".env.local")
 from apiHelper import *
@@ -206,6 +207,10 @@ def fetch_sip_trunks():
             status_code=500,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+    
+@app.get('/health')
+def health_check():
+    return JSONResponse(content={"status": "healthy"}, status_code=200) 
 
 
 # Run the FastAPI app on port 3002
